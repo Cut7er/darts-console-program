@@ -1,6 +1,7 @@
 import sqlite3
 
 darts_db = sqlite3.connect('data/database.db')
+
 cursor = darts_db.cursor()
 
 def create_table():
@@ -23,3 +24,4 @@ alter_table()
 
 cursor.close()    
 darts_db.close()
+
