@@ -3,7 +3,7 @@ import re
 import datetime
 from pandas import read_excel
 from colorama import init
-import playsound
+from playsound import playsound
 
 # autoreset of coloring after every printout
 init(autoreset=True)
@@ -109,7 +109,7 @@ class DBConnection:
 		self.db.commit()     
 	
 class Player:
-
+	"""Holds all relevant information about the two players."""
 	def __init__(self, name, score, score_history):
 		self.name = name
 		self.score = score
@@ -118,53 +118,74 @@ class Player:
 		self.legs = 0
 		self.sets = 0
 
-	def __str__(self): #nötig?
-		"""`print(player)` just prints the name of the player."""
+	def __str__(self):
+		"""'print(player)' just prints the name of the player."""
 		return self.name
 
+
+"""GAME-RELEVANT FUNCTIONS"""
 def get_player_hit():
 	"""Ask the user until he supplies a valid hit."""
 	while True:
 		try:
 			hit = int(input("Punkte geworfen: "))
 		except ValueError:
-			print(f"{RED}Bitte eine Zahl zwischen 0 und 180 eingeben!")
+			print(f"{RED}Bitte eine ganze ZAHL zwischen 0 und 180 eingeben!")
 		else:
 			if 0 <= hit <= 180:
 				if hit >= 100:
-					playsound.playsound('sounds/Applaus.mp3', True)
+					playsound('sounds/Applaus.mp3', True)
 				if hit == 0:
-					playsound.playsound('sounds/Meep.mp3', True)
+					playsound('sounds/Meep.mp3', True)
 				return hit
 			else:
-				print(f"{RED}Bitte eine Zahl zwischen 0 und 180 eingeben!")
+				print(f"{RED}Bitte eine ganze Zahl ZWISCHEN 0 UND 180 eingeben!")
 
+def check_for_valid_int(input_text):
+	"""checks if the user input is an integer - the parameter is the text the user gets to see"""
+	while True:
+		try:
+			the_verified_integer = int(input(input_text))
+			return the_verified_integer
+		except ValueError:
+			print(f"{RED}Bitte eine ganze Zahl eingeben!")
+
+def players_initial_setup():
+	players = [Player(input("\nSpieler 1: "), points_default, []),
+			   Player(input("Spieler 2: "), points_default, [])]
+	return players
+
+
+"""STATISTICS FUNCTIONS"""
 def player_statistics(players):
-	# query & show stats for each player before the game starts
+	"""query & show historic stats for each player before the game starts"""
 	for player in players:
 		player.score = points_default
 		player.score_history = []
 		player_wins = int(db.get_wins(player.name))
 		player_total_games = int(db.get_total_games(player.name))
+		
 		if player_total_games != 0:
 			player_win_ratio = player_wins / player_total_games
 		else:
-			player_win_ratio = 0			
+			player_win_ratio = 0		
+
 		print(f"\nGesamt-Statistik von {RED}{player.name}{CLEAR}")
 		print(f"Siege: {GREEN}{player_wins}{CLEAR} ----- Niederlagen: {GREEN}{player_total_games-player_wins}{CLEAR} ----- Siegquote: {GREEN}{player_win_ratio:.2f}")
 		print(f"Punkteschnitt:     {GREEN}{db.get_average_score(player.name, 10)}") #2nd parameter: gleitender durchschnitt über n spiele
-		print(f"Höchster Wurf:     {GREEN}{db.get_top_hit(player.name, 1000) }") #average score for all games of player  --> platzhalter für "all" finden
+		print(f"Höchster Wurf:     {GREEN}{db.get_top_hit(player.name, 1000)}") #average score for all games of player  --> platzhalter für "all" finden
 		print(f"Höchster Checkout: {GREEN}{db.get_max_checkout(1000,player.name)}") #same
 
-def player_versus(players): #verschönern, mit dynamischer Zeilenlänge
-	# show direct comparison between the two players (all games, and n games as a trend)
+def players_direct_comparison(players):
+	"""the two players are compared against each other, 1. for all games and 2. for the last n games""" 
 	nb_trend_games = 5
 	player1_direct_games = db.get_all_direct_games(players) 
 	player1_direct_wins = db.get_all_direct_wins(players)
 	player1_trend_games = db.get_trend_direct_games(players, nb_trend_games)
-	player1_trend_wins = db.get_trend_direct_wins(players, nb_trend_games) 
-	
+	player1_trend_wins = db.get_trend_direct_wins(players, nb_trend_games)
+
 	print(f"\n{WHITE_BG}----------------------------------------------------------------")
+
 	print(f"\nDirektvergleich         {RED}{players[0].name}   {GREEN}vs.   {RED}{players[1].name}{CLEAR}\n")
 	print(f"""~~~~~~~~~~~~~~~ {YELLOW}Gesamt{CLEAR}: {players[0].name} {GREEN}{int(player1_direct_wins)}  -  {int(player1_direct_games)
 	- int(player1_direct_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~\n""")    
@@ -180,23 +201,20 @@ def player_versus(players): #verschönern, mit dynamischer Zeilenlänge
 	else:
 		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(player1_trend_wins)}  -  {int(player1_trend_games)
 		- int(player1_trend_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")    
+	
 	print(f"\n{WHITE_BG}----------------------------------------------------------------")    
 
 def tournament_statistics():
+	"""shows tournament-specific stats for the two players in the tournament"""
 	print(f"Turnier-Statistik von {RED}{player.name}{CLEAR}")
 	print(f"gewonnene Sätze:   {GREEN}{player.sets}/{nb_sets}{CLEAR} ----- Anzahl Siege im aktuellen Satz: {GREEN}{player.legs}/3")
 	print(f"Punkteschnitt:     {GREEN}{db.get_average_score(player.name, players[0].wins + players[1].wins)}")
 	print(f"Höchster Wurf:     {GREEN}{db.get_top_hit(player.name, players[0].wins + players[1].wins)}") 
 	print(f"Höchster Checkout: {GREEN}{db.get_max_checkout(players[0].wins + players[1].wins, player.name)}\n") 
 
-def players_initial_setup():
-	players = [Player(input("\nSpieler 1: "), points_default, []),
-			   Player(input("Spieler 2: "), points_default, [])]
-	return players
-
 
 if __name__ == "__main__":
-	# game setup
+	# initial game setup - decide to play normal or tournament mode, and if tournament should be standard or custom
 	tournament_mode = False
 	tournament = input("\nTurnier spielen? [T]: ") 
 	if tournament.upper() == "T":
@@ -211,31 +229,15 @@ if __name__ == "__main__":
 			print(f"{RED}Standardeinstellungen!{CLEAR} Es werden {GREEN}{nb_sets} Sätze mit je {nb_legs} Siegen{CLEAR} zum Gesamtsieg benötigt!")	
 
 		else:
-			while True: #check for valid number in Funktion überführen
-				try:
-					nb_legs = int(input("\nSpiel-Anzahl für Satzsieg: "))
-					break
-				except ValueError:
-					print(f"{RED}Bitte eine Zahl eingeben!")
-
-			while True:
-				try:
-					nb_sets = int(input("Satz-Anzahl für Turniersieg: "))
-					break
-				except ValueError:
-					print(f"{RED}Bitte eine Zahl eingeben!")
+			nb_legs = check_for_valid_int("\nSpiel-Anzahl für Satzsieg: ") 
+			nb_sets = check_for_valid_int("Satz-Anzahl für Turniersieg: ")
+				
+	points_default = check_for_valid_int("\nStartpunktzahl bitte eingeben: ")	
 	
-	while True:
-		try:
-			points_default = int(input("\nStartpunktzahl bitte eingeben: "))
-			break
-		except ValueError:
-			print(f"{RED}Bitte eine Zahl eingeben!")
-
 	players = players_initial_setup()
 
-	# setup database connection
 	with DBConnection(DB_PATH) as db:
+		
 		while True:
 			
 			# switch players after every match so that they alternate
@@ -243,7 +245,7 @@ if __name__ == "__main__":
 				players[0], players[1] = players[1], players[0]
 
 			player_statistics(players) #custom function for statistics of opposing players
-			player_versus(players) # custom function for trend statistics of opposing players
+			players_direct_comparison(players) # custom function for trend statistics of opposing players
 				
 			print(f"\nWir spielen von {GREEN}{points_default}{CLEAR} runter. {RED}{players[0]}{CLEAR} beginnt!")
 
@@ -258,10 +260,12 @@ if __name__ == "__main__":
 					hit = get_player_hit()
 					player.score -= hit
 					player.score_history.append(hit)
+
 					if player.score == 0:
 						print(f"Punkte von {RED}{player}{CLEAR} nach dem Wurf: {GREEN}{player.score}\n")
 						print(f"{YELLOW}=====================***SIEG! SIEG! SIEG!***====================\n")
 						player.wins += 1
+						
 						if tournament_mode:
 							player.legs += 1
 							if player.legs == nb_legs:
@@ -284,6 +288,7 @@ if __name__ == "__main__":
 
 						play = False
 						break
+
 					elif player.score >= 2:
 						print(f"Punkte von {RED}{player}{CLEAR} nach dem Wurf: {GREEN}{player.score}")
 						print(f"\n----------------------------------------------------------------")
@@ -295,7 +300,7 @@ if __name__ == "__main__":
 			if tournament_mode:
 				for player in players:
 					if tournament_end == False:
-						# so that tournament stats are not printed twice!
+						# ensures that tournamen statistics are not printed twice / or forgotten
 						tournament_statistics()
 			else:
 				for player in players:
