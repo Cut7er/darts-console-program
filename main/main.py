@@ -51,7 +51,7 @@ class DBConnection:
 	def get_average_score(self, player, avg_limit):
 		self.cursor.execute(
 				"SELECT SUM(points)/SUM(turns) FROM (SELECT * FROM player_stats WHERE name == ? ORDER BY game_id DESC LIMIT ?)"
-				,(player,avg_limit,))
+				,(player, avg_limit,))
 		return re.sub("[()',]", "", str(self.cursor.fetchone()))
 	
 	def get_top_hit(self, player, nb_games):
@@ -63,7 +63,7 @@ class DBConnection:
 	def get_max_checkout(self, nb_games, player):
 		self.cursor.execute(
 			"SELECT MAX(CAST(checkout AS INT)) FROM (SELECT * FROM game_overview ORDER BY game_id DESC LIMIT ?) WHERE winner == ?"
-			,(nb_games,player,))
+			,(nb_games, player,))
 		return re.sub("[()',]", "", str(self.cursor.fetchone()))
 
 	def get_checkout(self, score):
@@ -71,32 +71,32 @@ class DBConnection:
 			"SELECT checkout FROM checkout_table WHERE value == ?", (score,))
 		return re.sub("[()',]", "", str(self.cursor.fetchone()))
 
-	def get_games_direct(self, player):
+	def get_all_direct_games(self, player):
 		self.cursor.execute(
 			"""SELECT COUNT(winner) FROM (SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?
 			UNION SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?) """
 			,(players[0].name, players[1].name, players[1].name, players[0].name,))
 		return re.sub("[()',]", "", str(self.cursor.fetchone()))
 	
-	def get_wins_direct(self, player):
+	def get_all_direct_wins(self, player):
 		self.cursor.execute(
 			"""SELECT COUNT(winner) FROM (SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?
 			UNION SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?) WHERE winner == ?"""
 			,(players[0].name, players[1].name, players[1].name, players[0].name, players[0].name,))
 		return re.sub("[()',]", "", str(self.cursor.fetchone()))
 	
-	def get_games_trend(self, player):
+	def get_trend_direct_games(self, player, nb_trend_games):
 		self.cursor.execute(
 			"""SELECT COUNT(winner) FROM (SELECT * FROM (SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?
-			UNION SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?) ORDER BY game_id DESC LIMIT 5)"""
-			,(players[0].name, players[1].name, players[1].name, players[0].name,))
+			UNION SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?) ORDER BY game_id DESC LIMIT ?)"""
+			,(players[0].name, players[1].name, players[1].name, players[0].name, nb_trend_games,))
 		return re.sub("[()',]", "", str(self.cursor.fetchone()))
 
-	def get_wins_trend(self, player):
+	def get_trend_direct_wins(self, player, nb_trend_games):
 		self.cursor.execute(
 			"""SELECT COUNT(winner) FROM (SELECT * FROM (SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?
-			UNION SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?) ORDER BY game_id DESC LIMIT 5) WHERE winner == ?"""
-			,(players[0].name, players[1].name, players[1].name, players[0].name, players[0].name,))
+			UNION SELECT * FROM game_overview WHERE player1 == ? AND player2 == ?) ORDER BY game_id DESC LIMIT ?) WHERE winner == ?"""
+			,(players[0].name, players[1].name, players[1].name, players[0].name, nb_trend_games, players[0].name,))
 		return re.sub("[()',]", "", str(self.cursor.fetchone()))
 
 	def record_game(self, player_1, player_2, winner, points_default, checkout, player_1_score_history, player_2_score_history): #crashes when one player has no history
@@ -157,26 +157,29 @@ def player_statistics(players):
 		print(f"Höchster Checkout: {GREEN}{db.get_max_checkout(1000,player.name)}") #same
 
 def player_versus(players): #verschönern, mit dynamischer Zeilenlänge
-	games_direct = db.get_games_direct(players) #abschaffen!
-	wins_direct = db.get_wins_direct(players)
-	games_trend = db.get_games_trend(players)
-	wins_trend = db.get_wins_trend(players)    
+	# show direct comparison between the two players (all games, and n games as a trend)
+	nb_trend_games = 5
+	player1_direct_games = db.get_all_direct_games(players) 
+	player1_direct_wins = db.get_all_direct_wins(players)
+	player1_trend_games = db.get_trend_direct_games(players, nb_trend_games)
+	player1_trend_wins = db.get_trend_direct_wins(players, nb_trend_games) 
+	
 	print(f"\n{WHITE_BG}----------------------------------------------------------------")
 	print(f"\nDirektvergleich         {RED}{players[0].name}   {GREEN}vs.   {RED}{players[1].name}{CLEAR}\n")
-	print(f"""~~~~~~~~~~~~~~~ {YELLOW}Gesamt{CLEAR}: {players[0].name} {GREEN}{int(wins_direct)}  -  {int(games_direct)
-	- int(wins_direct)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~\n""")    
-	if int(wins_direct) >= 10 and (int(games_direct) - int(wins_direct)) >= 10:
-		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(wins_trend)}   -   {int(games_trend)
-		- int(wins_trend)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")
-	elif int(wins_direct) >= 10 and (int(games_direct) - int(wins_direct)) < 10:
-		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(wins_trend)}   -  {int(games_trend)
-		- int(wins_trend)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")
-	elif int(wins_direct) < 10 and (int(games_direct) - int(wins_direct)) >= 10:
-		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(wins_trend)}  -   {int(games_trend)
-		- int(wins_trend)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")
+	print(f"""~~~~~~~~~~~~~~~ {YELLOW}Gesamt{CLEAR}: {players[0].name} {GREEN}{int(player1_direct_wins)}  -  {int(player1_direct_games)
+	- int(player1_direct_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~\n""")    
+	if int(player1_direct_wins) >= 10 and (int(player1_direct_games) - int(player1_direct_wins)) >= 10:
+		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(player1_trend_wins)}   -   {int(player1_trend_games)
+		- int(player1_trend_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")
+	elif int(player1_direct_wins) >= 10 and (int(player1_direct_games) - int(player1_direct_wins)) < 10:
+		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(player1_trend_wins)}   -  {int(player1_trend_games)
+		- int(player1_trend_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")
+	elif int(player1_direct_wins) < 10 and (int(player1_direct_games) - int(player1_direct_wins)) >= 10:
+		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(player1_trend_wins)}  -   {int(player1_trend_games)
+		- int(player1_trend_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")
 	else:
-		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(wins_trend)}  -  {int(games_trend)
-		- int(wins_trend)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")    
+		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(player1_trend_wins)}  -  {int(player1_trend_games)
+		- int(player1_trend_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")    
 	print(f"\n{WHITE_BG}----------------------------------------------------------------")    
 
 def tournament_statistics():
@@ -235,12 +238,12 @@ if __name__ == "__main__":
 	with DBConnection(DB_PATH) as db:
 		while True:
 			
-			player_statistics(players) #custom function for statistics of opposing players
-			player_versus(players) # custom function for trend statistics of opposing players
-			
 			# switch players after every match so that they alternate
 			if (players[0].wins + players[1].wins) != 0:
 				players[0], players[1] = players[1], players[0]
+
+			player_statistics(players) #custom function for statistics of opposing players
+			player_versus(players) # custom function for trend statistics of opposing players
 				
 			print(f"\nWir spielen von {GREEN}{points_default}{CLEAR} runter. {RED}{players[0]}{CLEAR} beginnt!")
 
@@ -255,7 +258,6 @@ if __name__ == "__main__":
 					hit = get_player_hit()
 					player.score -= hit
 					player.score_history.append(hit)
-					print(str(player.score_history))
 					if player.score == 0:
 						print(f"Punkte von {RED}{player}{CLEAR} nach dem Wurf: {GREEN}{player.score}\n")
 						print(f"{YELLOW}=====================***SIEG! SIEG! SIEG!***====================\n")
