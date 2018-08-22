@@ -199,7 +199,7 @@ def tournament_statistics():
 	print(f"gewonnene Sätze:   {GREEN}{player.sets}/{nb_sets}{CLEAR} ----- Anzahl Siege im aktuellen Satz: {GREEN}{player.legs}/3")
 	print(f"Punkteschnitt:     {GREEN}{db.get_average_score(player.name, players[0].wins + players[1].wins)}")
 	print(f"Höchster Wurf:     {GREEN}{db.get_top_hit(player.name, players[0].wins + players[1].wins)}") 
-	print(f"Höchster Checkout: {GREEN}{db.get_ma_checkout(players[0].wins + players[1].wins, player.name)}\n") 
+	print(f"Höchster Checkout: {GREEN}{db.get_max_checkout(players[0].wins + players[1].wins, player.name)}\n") 
 
 
 if __name__ == "__main__":
