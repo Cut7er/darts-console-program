@@ -14,11 +14,11 @@ GREEN = "\x1b[1;32;40m"
 RED = "\x1b[1;31;40m"
 CLEAR = "\x1b[0m"
 WHITE_BG = "\u001b[47m"
+BOLD = "\u001b[1m"
 
 DB_PATH = "data/database.db"
 
-# get checkout value list
-VALUES = set(read_excel('data/checkout.xlsx')["value"].tolist()) #Daten aus DB holen
+CHECKOUT_VARIANTS = set(read_excel('data/checkout.xlsx')["value"].tolist()) #Daten aus DB holen
 
 class DBConnection:
 	"""Manages a db connection and defines the needed queries.
@@ -99,13 +99,14 @@ class DBConnection:
 			,(players[0].name, players[1].name, players[1].name, players[0].name, nb_trend_games, players[0].name,))
 		return re.sub("[()',]", "", str(self.cursor.fetchone()))
 
-	def record_game(self, player_1, player_2, winner, points_default, checkout, player_1_score_history, player_2_score_history): #crashes when one player has no history
+	def record_game(self, player_1, player_2, winner, points_default, checkout, player_1_score_history, player_2_score_history): 
 		date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 		self.cursor.execute("INSERT INTO game_overview(game_id, player1, player2, winner, gamemode, checkout) VALUES (?, ?, ?, ?, ?, ?)",
 							(date, player_1, player_2, winner, points_default, checkout))
 		for player in players:
 			self.cursor.execute("INSERT INTO player_stats(game_id, name, points, turns, top_score, score_hist) VALUES (?, ?, ?, ?, ?, ?)",
-						   (date, player.name, sum(player.score_history), len(player.score_history), sorted(player.score_history)[-1], str(player.score_history)))
+						   (date, player.name, sum(player.score_history), len(player.score_history), 
+						   	sorted(player.score_history)[-1], str(player.score_history))) #crashes when one player has no history
 		self.db.commit()     
 	
 class Player:
@@ -181,28 +182,16 @@ def players_direct_comparison(players):
 	nb_trend_games = 5
 	player1_direct_games = db.get_all_direct_games(players) 
 	player1_direct_wins = db.get_all_direct_wins(players)
+	player1_direct_losses = str(int(player1_direct_games) - int(player1_direct_wins))
 	player1_trend_games = db.get_trend_direct_games(players, nb_trend_games)
 	player1_trend_wins = db.get_trend_direct_wins(players, nb_trend_games)
+	player1_trend_losses = str(int(player1_trend_games) - int(player1_trend_wins))
 
-	print(f"\n{WHITE_BG}----------------------------------------------------------------")
-
-	print(f"\nDirektvergleich         {RED}{players[0].name}   {GREEN}vs.   {RED}{players[1].name}{CLEAR}\n")
-	print(f"""~~~~~~~~~~~~~~~ {YELLOW}Gesamt{CLEAR}: {players[0].name} {GREEN}{int(player1_direct_wins)}  -  {int(player1_direct_games)
-	- int(player1_direct_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~\n""")    
-	if int(player1_direct_wins) >= 10 and (int(player1_direct_games) - int(player1_direct_wins)) >= 10:
-		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(player1_trend_wins)}   -   {int(player1_trend_games)
-		- int(player1_trend_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")
-	elif int(player1_direct_wins) >= 10 and (int(player1_direct_games) - int(player1_direct_wins)) < 10:
-		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(player1_trend_wins)}   -  {int(player1_trend_games)
-		- int(player1_trend_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")
-	elif int(player1_direct_wins) < 10 and (int(player1_direct_games) - int(player1_direct_wins)) >= 10:
-		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(player1_trend_wins)}  -   {int(player1_trend_games)
-		- int(player1_trend_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")
-	else:
-		print(f"""~~~~~~~~~~~~~~~ {YELLOW}Trend{CLEAR}:  {players[0].name} {GREEN}{int(player1_trend_wins)}  -  {int(player1_trend_games)
-		- int(player1_trend_wins)}{CLEAR} {players[1].name} ~~~~~~~~~~~~~~~~~""")    
-	
-	print(f"\n{WHITE_BG}----------------------------------------------------------------")    
+	print(f"\n{WHITE_BG}{64*'-'}") #als String einspeisen?!
+	print(f"\n{BOLD}Direktvergleich{CLEAR}{9*' '}{RED}{players[0].name}{4*' '}{GREEN}vs.{4*' '}{RED}{players[1].name}{CLEAR}\n")
+	print(f"""{15*'~'}{' '}{YELLOW}Gesamt{CLEAR}:{' '}{players[0].name}{' '}{GREEN}{int(player1_direct_wins)}{(int(4-len(player1_direct_wins)))*' '}-{(int(4-len(player1_direct_losses)))*' '}{int(player1_direct_losses)}{CLEAR}{' '}{players[1].name}{' '}{(28-len(players[0].name)-len(players[1].name))*'~'}\n""")
+	print(f"""{15*'~'}{' '}{YELLOW}Trend{CLEAR}:{'  '}{players[0].name}{' '}{GREEN}{int(player1_trend_wins)}{(int(4-len(player1_trend_wins)))*' '}-{(int(4-len(player1_trend_losses)))*' '}{int(player1_trend_losses)}{CLEAR}{' '}{players[1].name}{' '}{(28-len(players[0].name)-len(players[1].name))*'~'}""")   	
+	print(f"\n{WHITE_BG}{64*'-'}")
 
 def tournament_statistics():
 	"""shows tournament-specific stats for the two players in the tournament"""
@@ -210,7 +199,7 @@ def tournament_statistics():
 	print(f"gewonnene Sätze:   {GREEN}{player.sets}/{nb_sets}{CLEAR} ----- Anzahl Siege im aktuellen Satz: {GREEN}{player.legs}/3")
 	print(f"Punkteschnitt:     {GREEN}{db.get_average_score(player.name, players[0].wins + players[1].wins)}")
 	print(f"Höchster Wurf:     {GREEN}{db.get_top_hit(player.name, players[0].wins + players[1].wins)}") 
-	print(f"Höchster Checkout: {GREEN}{db.get_max_checkout(players[0].wins + players[1].wins, player.name)}\n") 
+	print(f"Höchster Checkout: {GREEN}{db.get_ma_checkout(players[0].wins + players[1].wins, player.name)}\n") 
 
 
 if __name__ == "__main__":
@@ -246,7 +235,7 @@ if __name__ == "__main__":
 
 			player_statistics(players) #custom function for statistics of opposing players
 			players_direct_comparison(players) # custom function for trend statistics of opposing players
-				
+
 			print(f"\nWir spielen von {GREEN}{points_default}{CLEAR} runter. {RED}{players[0]}{CLEAR} beginnt!")
 
 			# game loop
@@ -254,7 +243,7 @@ if __name__ == "__main__":
 			while play:
 				for player in players:
 					print(f"\nPunkte von {RED}{player}{CLEAR} vor dem Wurf:  {GREEN}{player.score}")
-					if player.score in VALUES:
+					if player.score in CHECKOUT_VARIANTS:
 						print("Checkout:", db.get_checkout(player.score))
 
 					hit = get_player_hit()
@@ -304,7 +293,7 @@ if __name__ == "__main__":
 						tournament_statistics()
 			else:
 				for player in players:
-					print(f"Gesamtsiege von {RED}{player}{CLEAR}: {GREEN}{player.wins}\n")
+					print(f"{GREEN}Gesamtsiege von {RED}{player}{CLEAR}: {GREEN}{player.wins}\n")
 
 			another_round = input(
 				"Neue Spieler? [N] - Abbruch? [Q] - Weiterspielen? [andere Taste].\n")
